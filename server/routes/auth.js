@@ -24,6 +24,23 @@ const getDatabase = () => {
 const router = express.Router();
 const SALT_ROUNDS = 12;
 
+// Test endpoint to verify database connection
+router.get('/test-db', async (req, res) => {
+  try {
+    const db = getDatabase();
+    console.log('Database type:', db.constructor.name);
+    res.json({
+      success: true,
+      dbType: db.constructor.name,
+      environment: process.env.NODE_ENV,
+      vercel: !!process.env.VERCEL
+    });
+  } catch (error) {
+    console.error('Database test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const signupSchema = Joi.object({
   email: Joi.string().email().required().messages({
     'string.email': 'Please provide a valid email address',
