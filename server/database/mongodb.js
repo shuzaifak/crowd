@@ -15,20 +15,30 @@ const connectDB = async () => {
       return true;
     }
     
+    console.log('🔄 Attempting MongoDB connection...');
+    console.log('MongoDB URI format:', mongoURI.substring(0, 50) + '...');
+    
     await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 5000,
-      maxPoolSize: 5,
+      serverSelectionTimeoutMS: 10000, // Increased timeout
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 10000,
+      maxPoolSize: 3, // Reduced pool size for serverless
       maxIdleTimeMS: 30000,
       bufferCommands: false,
-      bufferMaxEntries: 0
+      bufferMaxEntries: 0,
+      retryWrites: true,
+      writeConcern: { w: 'majority' }
     });
     
-    console.log('MongoDB connected successfully');
+    console.log('✅ MongoDB connected successfully');
     return true;
   } catch (error) {
-    console.error('MongoDB connection error:', error.message);
+    console.error('❌ MongoDB connection error details:', {
+      message: error.message,
+      code: error.code,
+      codeName: error.codeName,
+      name: error.name
+    });
     // DON'T exit process in serverless environment - just return false
     return false;
   }
