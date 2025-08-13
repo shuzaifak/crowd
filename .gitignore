@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment variables (don't upload passwords!)
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+npm-debug.log*
+
+# Database files (using MongoDB now)
+server/database/data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Temporary files
+*.tmp
+*.temp
