@@ -1,6 +1,19 @@
 const express = require('express');
-const db = process.env.USE_MONGODB ? require('../database/mongoDatabase') : require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+
+// Dynamic database selection to avoid import failures in serverless
+const getDatabase = () => {
+  try {
+    if (process.env.USE_MONGODB === 'true') {
+      return require('../database/mongoDatabase');
+    } else {
+      return require('../database/db');
+    }
+  } catch (error) {
+    console.warn('Database import failed, falling back to JSON storage:', error.message);
+    return require('../database/db');
+  }
+};
 
 const router = express.Router();
 
@@ -21,6 +34,7 @@ router.get('/:userId/stats', authenticateToken, async (req, res) => {
     }
 
     // Get user stats from database
+    const db = getDatabase();
     const user = await db.findUserById(userId);
     if (!user) {
       return res.status(404).json({ 

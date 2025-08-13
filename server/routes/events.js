@@ -1,35 +1,53 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
-const Event = require('../database/models/Event');
-const User = require('../database/models/User');
+
+// Dynamic database selection to avoid import failures in serverless
+const getDatabase = () => {
+  try {
+    if (process.env.USE_MONGODB === 'true') {
+      return require('../database/mongoDatabase');
+    } else {
+      return require('../database/db');
+    }
+  } catch (error) {
+    console.warn('Database import failed, falling back to JSON storage:', error.message);
+    return require('../database/db');
+  }
+};
 
 // Get all events for authenticated user (organizer dashboard)
 router.get('/my-events', authenticateToken, async (req, res) => {
     try {
         const { page = 1, limit = 20, status, search } = req.query;
-        const offset = (page - 1) * limit;
+        const db = getDatabase();
         
-        let query = { organizerId: req.user.id };
+        // Get all events and filter for this organizer
+        let allEvents = await db.getAllEvents();
+        let events = allEvents.filter(event => event.organizerId === req.user.id);
         
+        // Apply status filter
         if (status) {
-            query.status = status;
+            events = events.filter(event => event.status === status);
         }
         
+        // Apply search filter
         if (search) {
-            query.$or = [
-                { title: { $regex: search, $options: 'i' } },
-                { description: { $regex: search, $options: 'i' } },
-                { location: { $regex: search, $options: 'i' } }
-            ];
+            const searchTerm = search.toLowerCase();
+            events = events.filter(event =>
+                (event.title && event.title.toLowerCase().includes(searchTerm)) ||
+                (event.description && event.description.toLowerCase().includes(searchTerm)) ||
+                (event.location && event.location.toLowerCase().includes(searchTerm))
+            );
         }
         
-        const events = await Event.find(query)
-            .sort({ createdAt: -1 })
-            .limit(limit * 1)
-            .skip(offset);
-            
-        const total = await Event.countDocuments(query);
+        // Sort by creation date (newest first)
+        events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
+        // Apply pagination
+        const total = events.length;
+        const offset = (page - 1) * limit;
+        events = events.slice(offset, offset + parseInt(limit));
         
         res.json({
             success: true,
