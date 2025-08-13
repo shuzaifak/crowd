@@ -73,46 +73,79 @@ let indexRoutes, marketingRoutes, dashboardRoutes, ordersRoutes;
 let analyticsRoutes, teamRoutes, financeRoutes, appsRoutes;
 let collectionsRoutes, monetizeRoutes, eventsRoutes, likesRoutes;
 
+// Import core routes first
 try {
-  // Core routes
-  authRoutes = require('../server/routes/auth');
-  usersRoutes = require('../server/routes/users');
   const authMiddleware = require('../server/middleware/auth');
   authenticateToken = authMiddleware.authenticateToken;
-  
-  // Feature routes
-  indexRoutes = require('../server/routes/index');
-  marketingRoutes = require('../server/routes/marketing');
-  dashboardRoutes = require('../server/routes/dashboard');
-  ordersRoutes = require('../server/routes/orders');
-  analyticsRoutes = require('../server/routes/analytics');
-  teamRoutes = require('../server/routes/team');
-  financeRoutes = require('../server/routes/finance');
-  appsRoutes = require('../server/routes/apps');
-  collectionsRoutes = require('../server/routes/collections');
-  monetizeRoutes = require('../server/routes/monetize');
-  eventsRoutes = require('../server/routes/events');
-  likesRoutes = require('../server/routes/likes');
+  console.log('✅ Auth middleware imported successfully');
 } catch (error) {
-  console.error('Error importing routes:', error);
+  console.error('❌ Auth middleware import failed:', error.message);
 }
+
+try {
+  authRoutes = require('../server/routes/auth');
+  console.log('✅ Auth routes imported successfully');
+} catch (error) {
+  console.error('❌ Auth routes import failed:', error.message);
+}
+
+try {
+  usersRoutes = require('../server/routes/users');
+  console.log('✅ Users routes imported successfully');
+} catch (error) {
+  console.error('❌ Users routes import failed:', error.message);
+}
+
+// Import other routes with individual error handling
+const routesToImport = [
+  { name: 'index', path: '../server/routes/index', var: 'indexRoutes' },
+  { name: 'events', path: '../server/routes/events', var: 'eventsRoutes' },
+  { name: 'finance', path: '../server/routes/finance', var: 'financeRoutes' },
+  { name: 'apps', path: '../server/routes/apps', var: 'appsRoutes' },
+  { name: 'dashboard', path: '../server/routes/dashboard', var: 'dashboardRoutes' },
+  { name: 'marketing', path: '../server/routes/marketing', var: 'marketingRoutes' },
+  { name: 'analytics', path: '../server/routes/analytics', var: 'analyticsRoutes' },
+  { name: 'orders', path: '../server/routes/orders', var: 'ordersRoutes' },
+  { name: 'team', path: '../server/routes/team', var: 'teamRoutes' },
+  { name: 'collections', path: '../server/routes/collections', var: 'collectionsRoutes' },
+  { name: 'monetize', path: '../server/routes/monetize', var: 'monetizeRoutes' },
+  { name: 'likes', path: '../server/routes/likes', var: 'likesRoutes' }
+];
+
+routesToImport.forEach(route => {
+  try {
+    const routeModule = require(route.path);
+    eval(`${route.var} = routeModule`);
+    console.log(`✅ ${route.name} routes imported successfully`);
+  } catch (error) {
+    console.error(`❌ ${route.name} routes import failed:`, error.message);
+  }
+});
 
 // Database initialization with fallback
 let databaseReady = false;
 let dbError = null;
+let mongoConnected = false;
 
 const initializeDatabase = async () => {
   try {
     if (process.env.USE_MONGODB === 'true' && process.env.MONGODB_URI) {
       try {
         const { connectDB } = require('../server/database/mongodb');
-        await connectDB();
-        console.log('MongoDB connection initialized for Vercel');
-        databaseReady = true;
+        const connected = await connectDB();
+        if (connected) {
+          console.log('MongoDB connection initialized for Vercel');
+          mongoConnected = true;
+          databaseReady = true;
+        } else {
+          console.warn('MongoDB connection failed, falling back to JSON storage');
+          databaseReady = true; // JSON storage fallback
+          dbError = 'MongoDB unavailable, using JSON storage';
+        }
       } catch (mongoError) {
-        console.warn('MongoDB failed, falling back to JSON storage:', mongoError.message);
+        console.warn('MongoDB error, falling back to JSON storage:', mongoError.message);
         databaseReady = true; // JSON storage is always available
-        dbError = 'MongoDB unavailable, using JSON storage';
+        dbError = 'MongoDB error: ' + mongoError.message;
       }
     } else {
       console.log('Using JSON file storage (MongoDB disabled)');
@@ -125,8 +158,23 @@ const initializeDatabase = async () => {
   }
 };
 
-// Initialize database
-initializeDatabase();
+// Initialize database with timeout
+const dbInitPromise = initializeDatabase();
+
+// Ensure database is ready before processing requests
+const ensureDatabaseReady = async (req, res, next) => {
+  try {
+    await dbInitPromise;
+    next();
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    databaseReady = true; // Fallback to JSON
+    next();
+  }
+};
+
+// Apply database readiness check to all API routes
+app.use('/api', ensureDatabaseReady);
 
 // Database readiness middleware for protected routes
 const checkDatabaseReady = (req, res, next) => {
@@ -164,12 +212,13 @@ try {
 app.get('/api/health', (req, res) => {
   try {
     const healthData = { 
-      status: 'OK', 
+      status: databaseReady ? 'OK' : 'DEGRADED', 
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
       database: {
         type: process.env.USE_MONGODB === 'true' ? 'MongoDB' : 'JSON Files',
         ready: databaseReady,
+        mongoConnected: mongoConnected,
         error: dbError
       },
       routes: {
@@ -178,7 +227,9 @@ app.get('/api/health', (req, res) => {
         events: !!eventsRoutes,
         finance: !!financeRoutes,
         apps: !!appsRoutes
-      }
+      },
+      version: '1.0.0',
+      uptime: process.uptime()
     };
 
     res.json(healthData);

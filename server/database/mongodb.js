@@ -5,20 +5,32 @@ const connectDB = async () => {
     const mongoURI = process.env.MONGODB_URI;
     
     if (!mongoURI) {
-      throw new Error('MONGODB_URI environment variable is not set');
+      console.warn('MONGODB_URI environment variable is not set, falling back to JSON storage');
+      return false;
+    }
+
+    // Check if already connected
+    if (mongoose.connection.readyState === 1) {
+      console.log('MongoDB already connected');
+      return true;
     }
     
     await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 30000,
-      connectTimeoutMS: 30000,
-      socketTimeoutMS: 30000,
-      maxPoolSize: 10
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 5000,
+      maxPoolSize: 5,
+      maxIdleTimeMS: 30000,
+      bufferCommands: false,
+      bufferMaxEntries: 0
     });
     
     console.log('MongoDB connected successfully');
+    return true;
   } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
+    console.error('MongoDB connection error:', error.message);
+    // DON'T exit process in serverless environment - just return false
+    return false;
   }
 };
 
