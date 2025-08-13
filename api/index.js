@@ -190,7 +190,7 @@ const initializeDatabase = async () => {
   try {
     // Set default MongoDB URI if not provided
     if (!process.env.MONGODB_URI) {
-      process.env.MONGODB_URI = 'mongodb+srv://jalalsherazi575:MUSA123456@crowd.rmytvx2.mongodb.net/?retryWrites=true&w=majority&appName=CROWD';
+      process.env.MONGODB_URI = 'mongodb+srv://jalal:pgcboy@cluster0.xhahz.mongodb.net/crowd?retryWrites=true&w=majority';
     }
     
     // Set USE_MONGODB to true by default in production
