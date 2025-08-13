@@ -6,12 +6,15 @@ const getDatabase = () => {
   try {
     if (process.env.USE_MONGODB === 'true') {
       return require('../database/mongoDatabase');
+    } else if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
+      // Use memory database in serverless environment (Vercel)
+      return require('../database/memoryDb');
     } else {
       return require('../database/db');
     }
   } catch (error) {
-    console.warn('Database import failed, falling back to JSON storage:', error.message);
-    return require('../database/db');
+    console.warn('Database import failed, falling back to memory storage:', error.message);
+    return require('../database/memoryDb');
   }
 };
 
