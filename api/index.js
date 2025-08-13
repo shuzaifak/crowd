@@ -97,48 +97,99 @@ try {
   console.error('Error importing routes:', error);
 }
 
-// Database initialization
+// Database initialization with fallback
+let databaseReady = false;
+let dbError = null;
+
 const initializeDatabase = async () => {
   try {
-    if (process.env.USE_MONGODB === 'true') {
-      const { connectDB } = require('../server/database/mongodb');
-      await connectDB();
-      console.log('MongoDB connection initialized for Vercel');
+    if (process.env.USE_MONGODB === 'true' && process.env.MONGODB_URI) {
+      try {
+        const { connectDB } = require('../server/database/mongodb');
+        await connectDB();
+        console.log('MongoDB connection initialized for Vercel');
+        databaseReady = true;
+      } catch (mongoError) {
+        console.warn('MongoDB failed, falling back to JSON storage:', mongoError.message);
+        databaseReady = true; // JSON storage is always available
+        dbError = 'MongoDB unavailable, using JSON storage';
+      }
     } else {
       console.log('Using JSON file storage (MongoDB disabled)');
+      databaseReady = true;
     }
   } catch (error) {
-    console.error('Failed to connect to database:', error);
+    console.error('Database initialization failed:', error);
+    databaseReady = true; // Still allow JSON storage
+    dbError = error.message;
   }
 };
 
 // Initialize database
 initializeDatabase();
 
-// API Routes
-if (authRoutes) app.use('/api/auth', authRoutes);
-if (usersRoutes) app.use('/api/users', usersRoutes);
-if (indexRoutes) app.use('/api/index', indexRoutes);
-if (marketingRoutes) app.use('/api/marketing', marketingRoutes);
-if (dashboardRoutes) app.use('/api/dashboard', dashboardRoutes);
-if (ordersRoutes) app.use('/api/orders', ordersRoutes);
-if (analyticsRoutes) app.use('/api/analytics', analyticsRoutes);
-if (teamRoutes) app.use('/api/team', teamRoutes);
-if (financeRoutes) app.use('/api/finance', financeRoutes);
-if (appsRoutes) app.use('/api/apps', appsRoutes);
-if (collectionsRoutes) app.use('/api/collections', collectionsRoutes);
-if (monetizeRoutes) app.use('/api/monetize', monetizeRoutes);
-if (eventsRoutes) app.use('/api/events', eventsRoutes);
-if (likesRoutes) app.use('/api/likes', likesRoutes);
+// Database readiness middleware for protected routes
+const checkDatabaseReady = (req, res, next) => {
+  if (!databaseReady) {
+    return res.status(503).json({
+      error: 'Service Unavailable',
+      message: 'Database not ready. Please try again in a moment.',
+      dbError: dbError
+    });
+  }
+  next();
+};
+
+// API Routes with error handling
+try {
+  if (authRoutes) app.use('/api/auth', authRoutes);
+  if (usersRoutes) app.use('/api/users', checkDatabaseReady, usersRoutes);
+  if (indexRoutes) app.use('/api/index', indexRoutes);
+  if (marketingRoutes) app.use('/api/marketing', checkDatabaseReady, marketingRoutes);
+  if (dashboardRoutes) app.use('/api/dashboard', checkDatabaseReady, dashboardRoutes);
+  if (ordersRoutes) app.use('/api/orders', checkDatabaseReady, ordersRoutes);
+  if (analyticsRoutes) app.use('/api/analytics', checkDatabaseReady, analyticsRoutes);
+  if (teamRoutes) app.use('/api/team', checkDatabaseReady, teamRoutes);
+  if (financeRoutes) app.use('/api/finance', checkDatabaseReady, financeRoutes);
+  if (appsRoutes) app.use('/api/apps', checkDatabaseReady, appsRoutes);
+  if (collectionsRoutes) app.use('/api/collections', checkDatabaseReady, collectionsRoutes);
+  if (monetizeRoutes) app.use('/api/monetize', checkDatabaseReady, monetizeRoutes);
+  if (eventsRoutes) app.use('/api/events', checkDatabaseReady, eventsRoutes);
+  if (likesRoutes) app.use('/api/likes', checkDatabaseReady, likesRoutes);
+} catch (routeError) {
+  console.error('Error mounting routes:', routeError);
+}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    database: process.env.USE_MONGODB === 'true' ? 'MongoDB' : 'JSON Files'
-  });
+  try {
+    const healthData = { 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      database: {
+        type: process.env.USE_MONGODB === 'true' ? 'MongoDB' : 'JSON Files',
+        ready: databaseReady,
+        error: dbError
+      },
+      routes: {
+        auth: !!authRoutes,
+        users: !!usersRoutes,
+        events: !!eventsRoutes,
+        finance: !!financeRoutes,
+        apps: !!appsRoutes
+      }
+    };
+
+    res.json(healthData);
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 // Protected route example
@@ -153,29 +204,38 @@ if (authenticateToken) {
 
 // Root endpoint with API documentation
 app.get('/', (req, res) => {
-  res.json({
-    message: 'Crowd Event Platform API',
-    version: '1.0.0',
-    status: 'running',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth/* (signup, login, profile)',
-      events: '/api/events/* (CRUD, public discovery)',
-      users: '/api/users/* (user management)',
-      finance: '/api/finance/* (payouts, bank accounts)',
-      apps: '/api/apps/* (marketplace)',
-      dashboard: '/api/dashboard/* (analytics)',
-      marketing: '/api/marketing/* (campaigns)',
-      analytics: '/api/analytics/* (event metrics)',
-      orders: '/api/orders/* (ticket sales)',
-      teams: '/api/team/* (team management)',
-      monetize: '/api/monetize/* (monetization)',
-      collections: '/api/collections/* (event collections)',
-      likes: '/api/likes/* (user interactions)'
-    },
-    documentation: '/api/health'
-  });
+  try {
+    res.json({
+      message: 'Crowd Event Platform API',
+      version: '1.0.0',
+      status: 'running',
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        health: '/api/health',
+        auth: '/api/auth/* (signup, login, profile)',
+        events: '/api/events/* (CRUD, public discovery)',
+        users: '/api/users/* (user management)',
+        finance: '/api/finance/* (payouts, bank accounts)',
+        apps: '/api/apps/* (marketplace)',
+        dashboard: '/api/dashboard/* (analytics)',
+        marketing: '/api/marketing/* (campaigns)',
+        analytics: '/api/analytics/* (event metrics)',
+        orders: '/api/orders/* (ticket sales)',
+        teams: '/api/team/* (team management)',
+        monetize: '/api/monetize/* (monetization)',
+        collections: '/api/collections/* (event collections)',
+        likes: '/api/likes/* (user interactions)'
+      },
+      documentation: '/api/health'
+    });
+  } catch (error) {
+    console.error('Root endpoint error:', error);
+    res.status(500).json({
+      error: 'Root endpoint error',
+      message: 'API documentation unavailable',
+      health: '/api/health'
+    });
+  }
 });
 
 // Catch-all handler for undefined routes
