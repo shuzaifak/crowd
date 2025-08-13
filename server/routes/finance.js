@@ -1,8 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const db = process.env.USE_MONGODB ? require('../database/mongoDatabase') : require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const crypto = require('crypto');
+
+// Dynamic database selection to avoid import failures in serverless
+const getDatabase = () => {
+  try {
+    if (process.env.USE_MONGODB === 'true') {
+      return require('../database/mongoDatabase');
+    } else {
+      return require('../database/db');
+    }
+  } catch (error) {
+    console.warn('Database import failed, falling back to JSON storage:', error.message);
+    return require('../database/db');
+  }
+};
 
 const ENCRYPTION_ALGORITHM = 'aes-256-cbc';
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32);

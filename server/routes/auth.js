@@ -1,8 +1,21 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const Joi = require('joi');
-const db = process.env.USE_MONGODB ? require('../database/mongoDatabase') : require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
+
+// Dynamic database selection to avoid import failures in serverless
+const getDatabase = () => {
+  try {
+    if (process.env.USE_MONGODB === 'true') {
+      return require('../database/mongoDatabase');
+    } else {
+      return require('../database/db');
+    }
+  } catch (error) {
+    console.warn('Database import failed, falling back to JSON storage:', error.message);
+    return require('../database/db');
+  }
+};
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
@@ -51,6 +64,7 @@ router.post('/signup', async (req, res) => {
 
     const { email, firstName, lastName, password, isOrganizer } = value;
 
+    const db = getDatabase();
     const existingUser = await db.findUserByEmail(email);
     if (existingUser) {
       return res.status(409).json({ 
@@ -100,6 +114,7 @@ router.post('/login', async (req, res) => {
 
     const { email, password } = value;
 
+    const db = getDatabase();
     const user = await db.findUserByEmail(email);
     if (!user || !user.isActive) {
       return res.status(401).json({ 
@@ -169,6 +184,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
       });
     }
 
+    const db = getDatabase();
     const result = await db.updateUser(req.user.id, value);
     
     if (!result.success) {

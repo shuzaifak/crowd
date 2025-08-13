@@ -1,7 +1,20 @@
 const express = require('express');
 const Joi = require('joi');
 const { authenticateToken } = require('../middleware/auth');
-const db = process.env.USE_MONGODB ? require('../database/mongoDatabase') : require('../database/db');
+
+// Dynamic database selection to avoid import failures in serverless
+const getDatabase = () => {
+  try {
+    if (process.env.USE_MONGODB === 'true') {
+      return require('../database/mongoDatabase');
+    } else {
+      return require('../database/db');
+    }
+  } catch (error) {
+    console.warn('Database import failed, falling back to JSON storage:', error.message);
+    return require('../database/db');
+  }
+};
 
 const router = express.Router();
 
@@ -9,6 +22,7 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { category, search } = req.query;
+    const db = getDatabase();
     
     let apps = await db.getAllApps();
     
@@ -30,7 +44,7 @@ router.get('/', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       apps,
-      categories: await db.getAppCategories()
+      categories: await getDatabase().getAppCategories()
     });
   } catch (error) {
     console.error('Error fetching apps:', error);
@@ -41,6 +55,7 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get user's installed apps
 router.get('/installed', authenticateToken, async (req, res) => {
   try {
+    const db = getDatabase();
     const userApps = await db.getUserInstalledApps(req.user.id);
     res.json({
       success: true,
@@ -57,6 +72,8 @@ router.post('/:appId/install', authenticateToken, async (req, res) => {
   try {
     const { appId } = req.params;
     const userId = req.user.id;
+    
+    const db = getDatabase();
     
     // Check if app exists
     const app = await db.getAppById(appId);
@@ -92,6 +109,7 @@ router.delete('/:appId/uninstall', authenticateToken, async (req, res) => {
   try {
     const { appId } = req.params;
     const userId = req.user.id;
+    const db = getDatabase();
     
     const result = await db.uninstallApp(userId, appId);
     if (!result.success) {
@@ -113,6 +131,7 @@ router.get('/:appId', authenticateToken, async (req, res) => {
   try {
     const { appId } = req.params;
     const userId = req.user.id;
+    const db = getDatabase();
     
     const app = await db.getAppById(appId);
     if (!app) {
@@ -137,6 +156,7 @@ router.get('/:appId', authenticateToken, async (req, res) => {
 // Get app categories
 router.get('/categories/list', authenticateToken, async (req, res) => {
   try {
+    const db = getDatabase();
     const categories = await db.getAppCategories();
     res.json({
       success: true,
@@ -164,6 +184,7 @@ router.post('/:appId/rate', authenticateToken, async (req, res) => {
     const { appId } = req.params;
     const userId = req.user.id;
     const { rating, review } = value;
+    const db = getDatabase();
     
     const result = await db.rateApp(userId, appId, rating, review);
     if (!result.success) {
