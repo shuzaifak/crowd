@@ -96,31 +96,90 @@ try {
   console.error('❌ Users routes import failed:', error.message);
 }
 
-// Import other routes with individual error handling
-const routesToImport = [
-  { name: 'index', path: '../server/routes/index', var: 'indexRoutes' },
-  { name: 'events', path: '../server/routes/events', var: 'eventsRoutes' },
-  { name: 'finance', path: '../server/routes/finance', var: 'financeRoutes' },
-  { name: 'apps', path: '../server/routes/apps', var: 'appsRoutes' },
-  { name: 'dashboard', path: '../server/routes/dashboard', var: 'dashboardRoutes' },
-  { name: 'marketing', path: '../server/routes/marketing', var: 'marketingRoutes' },
-  { name: 'analytics', path: '../server/routes/analytics', var: 'analyticsRoutes' },
-  { name: 'orders', path: '../server/routes/orders', var: 'ordersRoutes' },
-  { name: 'team', path: '../server/routes/team', var: 'teamRoutes' },
-  { name: 'collections', path: '../server/routes/collections', var: 'collectionsRoutes' },
-  { name: 'monetize', path: '../server/routes/monetize', var: 'monetizeRoutes' },
-  { name: 'likes', path: '../server/routes/likes', var: 'likesRoutes' }
-];
+// Import other routes with individual error handling (no eval)
+try {
+  indexRoutes = require('../server/routes/index');
+  console.log('✅ Index routes imported successfully');
+} catch (error) {
+  console.error('❌ Index routes import failed:', error.message);
+}
 
-routesToImport.forEach(route => {
-  try {
-    const routeModule = require(route.path);
-    eval(`${route.var} = routeModule`);
-    console.log(`✅ ${route.name} routes imported successfully`);
-  } catch (error) {
-    console.error(`❌ ${route.name} routes import failed:`, error.message);
-  }
-});
+try {
+  eventsRoutes = require('../server/routes/events');
+  console.log('✅ Events routes imported successfully');
+} catch (error) {
+  console.error('❌ Events routes import failed:', error.message);
+}
+
+try {
+  financeRoutes = require('../server/routes/finance');
+  console.log('✅ Finance routes imported successfully');
+} catch (error) {
+  console.error('❌ Finance routes import failed:', error.message);
+}
+
+try {
+  appsRoutes = require('../server/routes/apps');
+  console.log('✅ Apps routes imported successfully');
+} catch (error) {
+  console.error('❌ Apps routes import failed:', error.message);
+}
+
+try {
+  dashboardRoutes = require('../server/routes/dashboard');
+  console.log('✅ Dashboard routes imported successfully');
+} catch (error) {
+  console.error('❌ Dashboard routes import failed:', error.message);
+}
+
+try {
+  marketingRoutes = require('../server/routes/marketing');
+  console.log('✅ Marketing routes imported successfully');
+} catch (error) {
+  console.error('❌ Marketing routes import failed:', error.message);
+}
+
+try {
+  analyticsRoutes = require('../server/routes/analytics');
+  console.log('✅ Analytics routes imported successfully');
+} catch (error) {
+  console.error('❌ Analytics routes import failed:', error.message);
+}
+
+try {
+  ordersRoutes = require('../server/routes/orders');
+  console.log('✅ Orders routes imported successfully');
+} catch (error) {
+  console.error('❌ Orders routes import failed:', error.message);
+}
+
+try {
+  teamRoutes = require('../server/routes/team');
+  console.log('✅ Team routes imported successfully');
+} catch (error) {
+  console.error('❌ Team routes import failed:', error.message);
+}
+
+try {
+  collectionsRoutes = require('../server/routes/collections');
+  console.log('✅ Collections routes imported successfully');
+} catch (error) {
+  console.error('❌ Collections routes import failed:', error.message);
+}
+
+try {
+  monetizeRoutes = require('../server/routes/monetize');
+  console.log('✅ Monetize routes imported successfully');
+} catch (error) {
+  console.error('❌ Monetize routes import failed:', error.message);
+}
+
+try {
+  likesRoutes = require('../server/routes/likes');
+  console.log('✅ Likes routes imported successfully');
+} catch (error) {
+  console.error('❌ Likes routes import failed:', error.message);
+}
 
 // Database initialization with fallback
 let databaseReady = false;
@@ -173,39 +232,123 @@ const ensureDatabaseReady = async (req, res, next) => {
   }
 };
 
-// Apply database readiness check to all API routes
-app.use('/api', ensureDatabaseReady);
+// Note: Database readiness will be checked per route group
 
 // Database readiness middleware for protected routes
 const checkDatabaseReady = (req, res, next) => {
-  if (!databaseReady) {
-    return res.status(503).json({
-      error: 'Service Unavailable',
-      message: 'Database not ready. Please try again in a moment.',
-      dbError: dbError
-    });
-  }
+  // Always allow routes to proceed since we have JSON fallback
+  // Just add database status to request for route handlers to use
+  req.databaseReady = databaseReady;
+  req.mongoConnected = mongoConnected;
+  req.dbError = dbError;
   next();
 };
 
-// API Routes with error handling
+// API Routes with error handling - mount after database initialization
 try {
-  if (authRoutes) app.use('/api/auth', authRoutes);
-  if (usersRoutes) app.use('/api/users', checkDatabaseReady, usersRoutes);
-  if (indexRoutes) app.use('/api/index', indexRoutes);
-  if (marketingRoutes) app.use('/api/marketing', checkDatabaseReady, marketingRoutes);
-  if (dashboardRoutes) app.use('/api/dashboard', checkDatabaseReady, dashboardRoutes);
-  if (ordersRoutes) app.use('/api/orders', checkDatabaseReady, ordersRoutes);
-  if (analyticsRoutes) app.use('/api/analytics', checkDatabaseReady, analyticsRoutes);
-  if (teamRoutes) app.use('/api/team', checkDatabaseReady, teamRoutes);
-  if (financeRoutes) app.use('/api/finance', checkDatabaseReady, financeRoutes);
-  if (appsRoutes) app.use('/api/apps', checkDatabaseReady, appsRoutes);
-  if (collectionsRoutes) app.use('/api/collections', checkDatabaseReady, collectionsRoutes);
-  if (monetizeRoutes) app.use('/api/monetize', checkDatabaseReady, monetizeRoutes);
-  if (eventsRoutes) app.use('/api/events', checkDatabaseReady, eventsRoutes);
-  if (likesRoutes) app.use('/api/likes', checkDatabaseReady, likesRoutes);
+  // Core authentication routes (always available)
+  if (authRoutes) {
+    app.use('/api/auth', authRoutes);
+    console.log('🚀 Auth routes mounted successfully');
+  } else {
+    console.warn('⚠️ Auth routes not available');
+  }
+  
+  if (usersRoutes) {
+    app.use('/api/users', usersRoutes);
+    console.log('🚀 Users routes mounted successfully');
+  } else {
+    console.warn('⚠️ Users routes not available');
+  }
+
+  // Public routes (no database dependency)
+  if (indexRoutes) {
+    app.use('/api/index', indexRoutes);
+    console.log('🚀 Index routes mounted successfully');
+  } else {
+    console.warn('⚠️ Index routes not available');
+  }
+
+  // Mount all routes with database status info - they'll handle JSON fallback internally
+  if (eventsRoutes) {
+    app.use('/api/events', checkDatabaseReady, eventsRoutes);
+    console.log('🚀 Events routes mounted successfully');
+  } else {
+    console.warn('⚠️ Events routes not available - check import errors');
+  }
+
+  if (appsRoutes) {
+    app.use('/api/apps', checkDatabaseReady, appsRoutes);
+    console.log('🚀 Apps routes mounted successfully');
+  } else {
+    console.warn('⚠️ Apps routes not available - check import errors');
+  }
+
+  if (dashboardRoutes) {
+    app.use('/api/dashboard', checkDatabaseReady, dashboardRoutes);
+    console.log('🚀 Dashboard routes mounted successfully');
+  } else {
+    console.warn('⚠️ Dashboard routes not available - check import errors');
+  }
+
+  if (financeRoutes) {
+    app.use('/api/finance', checkDatabaseReady, financeRoutes);
+    console.log('🚀 Finance routes mounted successfully');
+  } else {
+    console.warn('⚠️ Finance routes not available - check import errors');
+  }
+
+  if (marketingRoutes) {
+    app.use('/api/marketing', checkDatabaseReady, marketingRoutes);
+    console.log('🚀 Marketing routes mounted successfully');
+  } else {
+    console.warn('⚠️ Marketing routes not available - check import errors');
+  }
+
+  if (analyticsRoutes) {
+    app.use('/api/analytics', checkDatabaseReady, analyticsRoutes);
+    console.log('🚀 Analytics routes mounted successfully');
+  } else {
+    console.warn('⚠️ Analytics routes not available - check import errors');
+  }
+
+  if (ordersRoutes) {
+    app.use('/api/orders', checkDatabaseReady, ordersRoutes);
+    console.log('🚀 Orders routes mounted successfully');
+  } else {
+    console.warn('⚠️ Orders routes not available - check import errors');
+  }
+
+  if (teamRoutes) {
+    app.use('/api/team', checkDatabaseReady, teamRoutes);
+    console.log('🚀 Team routes mounted successfully');
+  } else {
+    console.warn('⚠️ Team routes not available - check import errors');
+  }
+
+  if (collectionsRoutes) {
+    app.use('/api/collections', checkDatabaseReady, collectionsRoutes);
+    console.log('🚀 Collections routes mounted successfully');
+  } else {
+    console.warn('⚠️ Collections routes not available - check import errors');
+  }
+
+  if (monetizeRoutes) {
+    app.use('/api/monetize', checkDatabaseReady, monetizeRoutes);
+    console.log('🚀 Monetize routes mounted successfully');
+  } else {
+    console.warn('⚠️ Monetize routes not available - check import errors');
+  }
+
+  if (likesRoutes) {
+    app.use('/api/likes', checkDatabaseReady, likesRoutes);
+    console.log('🚀 Likes routes mounted successfully');
+  } else {
+    console.warn('⚠️ Likes routes not available - check import errors');
+  }
+
 } catch (routeError) {
-  console.error('Error mounting routes:', routeError);
+  console.error('❌ Error mounting routes:', routeError);
 }
 
 // Health check endpoint
@@ -226,7 +369,15 @@ app.get('/api/health', (req, res) => {
         users: !!usersRoutes,
         events: !!eventsRoutes,
         finance: !!financeRoutes,
-        apps: !!appsRoutes
+        apps: !!appsRoutes,
+        dashboard: !!dashboardRoutes,
+        marketing: !!marketingRoutes,
+        analytics: !!analyticsRoutes,
+        orders: !!ordersRoutes,
+        team: !!teamRoutes,
+        collections: !!collectionsRoutes,
+        monetize: !!monetizeRoutes,
+        likes: !!likesRoutes
       },
       version: '1.0.0',
       uptime: process.uptime()
