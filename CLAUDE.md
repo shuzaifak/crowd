@@ -110,7 +110,20 @@ MONGODB_URI=mongodb://...   # MongoDB connection string
 
 ### Development Workflow
 - **Hot Reload**: `npm run dev` for development with automatic restarts
-- **Testing**: Multiple test scripts and utilities in root directory
-- **API Documentation**: Comprehensive docs in `API_DOCUMENTATION.md`
+- **Testing**: Comprehensive endpoint testing via `test-all-endpoints.js` (tests all API routes with authentication)
+- **API Documentation**: Complete reference in `API_DOCUMENTATION.md`
 - **Admin Setup**: Use `server/scripts/make-admin.js` to create admin users
 - **Static Assets**: All frontend files served directly from root directory
+
+### Testing
+- `node test-all-endpoints.js` - Comprehensive API endpoint testing
+- Tests cover authentication, events, finance, apps, analytics, and dashboard endpoints
+- Automated test user creation and cleanup
+- Configurable test environment via BASE_URL in test file
+
+### Serverless Deployment
+- **Platform**: Configured for Vercel deployment
+- **Entry Point**: `/api/index.js` (serverless function wrapper)
+- **Routing**: All requests routed through serverless function via `vercel.json`
+- **Build**: No-op build process (`npm run build` echoes completion message)
+- **Production**: Serverless functions handle all API routes automatically

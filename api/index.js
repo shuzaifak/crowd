@@ -188,31 +188,41 @@ let mongoConnected = false;
 
 const initializeDatabase = async () => {
   try {
+    // Set default MongoDB URI if not provided
+    if (!process.env.MONGODB_URI) {
+      process.env.MONGODB_URI = 'mongodb+srv://jalalsherazi575:MUSA123456@crowd.rmytvx2.mongodb.net/?retryWrites=true&w=majority&appName=CROWD';
+    }
+    
+    // Set USE_MONGODB to true by default in production
+    if (!process.env.USE_MONGODB && process.env.NODE_ENV === 'production') {
+      process.env.USE_MONGODB = 'true';
+    }
+
     if (process.env.USE_MONGODB === 'true' && process.env.MONGODB_URI) {
       try {
         const { connectDB } = require('../server/database/mongodb');
         const connected = await connectDB();
         if (connected) {
-          console.log('MongoDB connection initialized for Vercel');
+          console.log('✅ MongoDB connected successfully for Vercel');
           mongoConnected = true;
           databaseReady = true;
         } else {
-          console.warn('MongoDB connection failed, falling back to JSON storage');
-          databaseReady = true; // JSON storage fallback
-          dbError = 'MongoDB unavailable, using JSON storage';
+          console.warn('❌ MongoDB connection failed, will use database abstraction layer fallback');
+          databaseReady = true; // Database abstraction layer will handle fallback
+          dbError = 'MongoDB connection failed, using fallback storage';
         }
       } catch (mongoError) {
-        console.warn('MongoDB error, falling back to JSON storage:', mongoError.message);
-        databaseReady = true; // JSON storage is always available
+        console.warn('❌ MongoDB error, will use database abstraction layer fallback:', mongoError.message);
+        databaseReady = true; // Database abstraction layer available
         dbError = 'MongoDB error: ' + mongoError.message;
       }
     } else {
-      console.log('Using JSON file storage (MongoDB disabled)');
+      console.log('Using database abstraction layer (MongoDB disabled)');
       databaseReady = true;
     }
   } catch (error) {
     console.error('Database initialization failed:', error);
-    databaseReady = true; // Still allow JSON storage
+    databaseReady = true; // Still allow fallback storage
     dbError = error.message;
   }
 };

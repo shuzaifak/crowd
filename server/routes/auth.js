@@ -6,17 +6,24 @@ const { generateToken, authenticateToken } = require('../middleware/auth');
 // Dynamic database selection to avoid import failures in serverless
 const getDatabase = () => {
   try {
+    // Default to MongoDB in production
+    if (!process.env.USE_MONGODB && process.env.NODE_ENV === 'production') {
+      process.env.USE_MONGODB = 'true';
+    }
+    
     if (process.env.USE_MONGODB === 'true') {
+      console.log('🔗 Using MongoDB database');
       return require('../database/mongoDatabase');
     } else if (process.env.NODE_ENV === 'production') {
-      // Use memory database in production/serverless environment
-      console.log('Using memory database for production environment');
+      // Use memory database in production/serverless environment as fallback
+      console.log('💾 Using memory database for production environment');
       return require('../database/memoryDb');
     } else {
+      console.log('📁 Using JSON file database for development');
       return require('../database/db');
     }
   } catch (error) {
-    console.warn('Database import failed, falling back to memory storage:', error.message);
+    console.warn('❌ Database import failed, falling back to memory storage:', error.message);
     return require('../database/memoryDb');
   }
 };
