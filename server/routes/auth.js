@@ -8,8 +8,9 @@ const getDatabase = () => {
   try {
     if (process.env.USE_MONGODB === 'true') {
       return require('../database/mongoDatabase');
-    } else if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
-      // Use memory database in serverless environment (Vercel)
+    } else if (process.env.NODE_ENV === 'production') {
+      // Use memory database in production/serverless environment
+      console.log('Using memory database for production environment');
       return require('../database/memoryDb');
     } else {
       return require('../database/db');
